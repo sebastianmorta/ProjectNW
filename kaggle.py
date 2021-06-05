@@ -51,10 +51,11 @@ def preprocess_image(img, feature_extraction_method=OVERLAPPING_METHOD):
     if feature_extraction_method == OVERLAPPING_METHOD:
         img_copy = img.copy()
         if len(img.shape) > 2:
-            img_copy = cv2.cvtColor(img_copy, cv2.COLOR_BGR2GRAY)
-        img_copy = cv2.medianBlur(img_copy, 5)
-        img_copy = cv2.threshold(img_copy, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-        min_vertical, max_vertical = get_corpus_boundaries(img_copy)
+            img_copy = cv2.cvtColor(img_copy, cv2.COLOR_BGR2GRAY)  # conversion to the other color space(gray)
+        img_copy = cv2.medianBlur(img_copy, 5)  #(reduce noise) non-linear technique takes a median of all the pixels under the kernel area and replaces the central element with this median value.
+        img_copy = cv2.threshold(img_copy, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]# progowanie ale trza sprawdzić jakie konkretnie
+
+        min_vertical, max_vertical = get_corpus_boundaries(img_copy)#cut edges of image
         img_copy = img_copy[min_vertical:max_vertical]
         return img_copy
 
@@ -75,9 +76,9 @@ def preprocess_image(img, feature_extraction_method=OVERLAPPING_METHOD):
 
 def get_corpus_boundaries(img):
     crop = []
-    horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (100, 1))
-    detect_horizontal = cv2.morphologyEx(img, cv2.MORPH_OPEN, horizontal_kernel, iterations=2)
-    contours = cv2.findContours(detect_horizontal, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (100, 1))# it makes image where all places with leters are marked
+    detect_horizontal = cv2.morphologyEx(img, cv2.MORPH_OPEN, horizontal_kernel, iterations=2)#Opening is just another name of erosion followed by dilation. It is useful in removing noise.
+    contours = cv2.findContours(detect_horizontal, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)#marked contours of edges| returns 2 or 3 values
     contours = contours[0] if len(contours) == 2 else contours[1]
     prev = -1
     for i, c in enumerate(contours):
@@ -247,7 +248,7 @@ def predict(model, test_image, feature_extraction_method=OVERLAPPING_METHOD, cla
 
 
 def read_random_images(root):
-    images = [] #images table
+    images = []  # images table
     labels = []
     test_images = []
     test_labels = []
@@ -255,28 +256,30 @@ def read_random_images(root):
         found_images = False
         while not found_images:
             images_path = root
-            random_writer = random.randrange(AVAILABLE_WRITERS)
+            random_writer = random.randrange(AVAILABLE_WRITERS)  # losowa liczba 0-672
             if random_writer < 10:
-                random_writer = "00" + str(random_writer)
+                random_writer = "00" + str(random_writer)  # dla folderów o numerze<10
             elif random_writer < 100:
-                random_writer = "0" + str(random_writer)
-            images_path = os.path.join(images_path, str(random_writer))
+                random_writer = "0" + str(random_writer)  # dla folderów o numerze<100
+            images_path = os.path.join(images_path, str(random_writer))  # ścieżka do konkretnego folderu z danymi
             if not os.path.isdir(images_path):
                 continue
-            _, _, filenames = next(walk(images_path))
-            if len(filenames) <= 2 and i == 2 and len(test_images) == 0:
+            _, _, filenames = next(walk(images_path))  # następny plik w folderze
+            if len(filenames) <= 2 and i == 2 and len(
+                    test_images) == 0:  # jeśli liczba zdjęć w folderze jest <=2 i jest to 3 iteracja i zbiór na dane testowe jest pusty to pomiń
                 continue
-            if len(filenames) >= 2:
-                found_images = True
+            if len(filenames) >= 2:  # dla folderów z wielomoa zdjęciami
+                found_images = True  # kończymy pętlę while
                 chosen_filenames = []
                 for j in range(2):
-                    random_filename = random.choice(filenames)
-                    while random_filename in chosen_filenames:
+
+                    random_filename = random.choice(filenames)  # wybieramy radnomowo zdjęcie z folderu
+                    while random_filename in chosen_filenames:  # tylko dla 2 iteracji pomijamy duplikaty
                         random_filename = random.choice(filenames)
-                    chosen_filenames.append(random_filename)
-                    images.append(cv2.imread(os.path.join(images_path, random_filename)))
-                    labels.append(i + 1)
-                if len(filenames) >= 3:
+                    chosen_filenames.append(random_filename)  # lista wybranych zdjęć
+                    images.append(cv2.imread(os.path.join(images_path, random_filename)))  # saved photos
+                    labels.append(i + 1)  # labels [1, 1, 2, 2, 3, 3]
+                if len(filenames) >= 3:  # if we have more than 3 images make test data
                     random_filename = random.choice(filenames)
                     while random_filename in chosen_filenames:
                         random_filename = random.choice(filenames)
@@ -284,8 +287,9 @@ def read_random_images(root):
                     test_images.append(cv2.imread(os.path.join(images_path, random_filename)))
                     test_labels.append(i + 1)
     test_choice = random.randint(0, len(test_images) - 1)
-    test_image = test_images[test_choice]
-    test_label = test_labels[test_choice]
+    test_image = test_images[test_choice]  # choice only one test image
+    test_label = test_labels[test_choice]  # choice only one test image
+    print("labels", labels)
     return images, labels, test_image, test_label
 
 
@@ -320,13 +324,13 @@ def extract_features(images, labels, feature_extraction_method=OVERLAPPING_METHO
 
 epochs = 100
 root = 'datasets'
-print("dupa",root)
+print("dupa", root)
 feature_extraction_method = OVERLAPPING_METHOD
 classifier_type = SUPPORT_VECTOR_CLASSIFIER
 correct_predictions = 0
 total_execution_time = 0
 for epoch in range(epochs):
-    images, labels, test_image, test_label = read_random_images(root)
+    images, labels, test_image, test_label = read_random_images(root)  # choice learning set and test set
     start_time = time.time()
     features, features_labels = extract_features(images, labels, feature_extraction_method)
     model = model_generator(features, features_labels, feature_extraction_method, classifier_type)
